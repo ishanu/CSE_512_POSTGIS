@@ -6,9 +6,9 @@ import psycopg2
 import sys
 from threading import Thread
 
-# Do not close the connection inside this file i.e. do not perform openConnection.close()
-def setupFragments (openConnection):
-    cur = openConnection.cursor()
+def setupFragments (cur):
+    dropTable('output',cur)
+    cur.execute("CREATE TABLE output (_count bigint, rectangle geometry)")
     cur.execute('select max(st_ymax(geom) - st_ymin(geom)) from rectangles')
     largest_height = cur.fetchone()[0]
     cur.execute('select * from rectangles order by latitude2 desc limit 1')
@@ -24,13 +24,10 @@ def setupFragments (openConnection):
     dropTable('rectsf2',cur)
     dropTable('rectsf3',cur)
     dropTable('rectsf4',cur)
+    dropTable('rectsf4',cur)
     createFragmentsRectangles(cur, largest_height/2, fragmentation_point, lowest_latitude)
     createFragmentsPoints(cur, largest_height/2, fragmentation_point, lowest_latitude)
-
     print('fragments complete')
-    cur.close()
-    openConnection.commit()
-    pass
 
 def createFragmentsRectangles(cur, largest_height, fragmentation_point, lowest_latitude):
     cur.execute(
@@ -56,16 +53,24 @@ def createFragmentsPoints(cur, largest_height, fragmentation_point, lowest_latit
     cur.execute(
         'CREATE TABLE pointsf4 AS select * from points where latitude >= ' + str(lowest_latitude + (3*fragmentation_point) - largest_height))
 
-
-
 def dropTable (table_name, cur):
     cur.execute('DROP TABLE IF EXISTS ' + table_name)
 
-
+# Do not close the connection inside this file i.e. do not perform openConnection.close()
 def parallelJoin (pointsTable, rectsTable, outputTable, outputPath, openConnection):
     cur = openConnection.cursor()
-    dropTable('output',cur)
-    cur.execute("CREATE TABLE output (_count bigint, rectangle geometry)")
+    setupFragments(cur)
+    threadOperations(cur)
+    cur.execute("SELECT DISTINCT _count, rectangle from output order by _count asc")
+    rows = cur.fetchall()
+    f = open(outputPath, "a")
+    for row in rows:
+        f.write(str(row[0])+'\n')
+    f.close()
+    print('join done')
+    openConnection.commit()
+
+def threadOperations(cur):
     thread1 = Thread(target = joinFragments, args=('pointsf1','rectsf1',cur))
     thread2 = Thread(target = joinFragments, args=('pointsf2','rectsf2',cur))
     thread3 = Thread(target = joinFragments, args=('pointsf3','rectsf3',cur))
@@ -78,17 +83,6 @@ def parallelJoin (pointsTable, rectsTable, outputTable, outputPath, openConnecti
     thread2.join()
     thread3.join()
     thread4.join()
-    cur.execute("SELECT DISTINCT _count, rectangle from output order by _count asc")
-    rows = cur.fetchall()
-    f = open(outputPath, "a")
-    for row in rows:
-        f.write(str(row[0])+'\n')
-    f.close()
-    print('join done')
-    openConnection.commit()
-
-
-################### DO NOT CHANGE ANYTHING BELOW THIS #############################
 
 def joinFragments(pointsTable, rectsTable, cur):
     cur.execute('INSERT INTO output (_count,rectangle) SELECT  count( ' + pointsTable + '.geom) AS count , ' + rectsTable
@@ -96,9 +90,10 @@ def joinFragments(pointsTable, rectsTable, cur):
         + ' JOIN ' + pointsTable + ' ON st_contains('+ rectsTable +'.geom,' + pointsTable + '.geom) GROUP BY '
         +rectsTable +'.geom order by count asc')
 
+################### DO NOT CHANGE ANYTHING BELOW THIS #############################
 
 # Donot change this function
-def getOpenConnection(user='postgres', password='admin', dbname='dds_assignment2'):
+def getOpenConnection(user='postgres', password='12345', dbname='dds_assignment2'):
     return psycopg2.connect("dbname='" + dbname + "' user='" + user + "' host='localhost' password='" + password + "'")
 
 # Donot change this function

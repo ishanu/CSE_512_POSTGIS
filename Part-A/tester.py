@@ -11,7 +11,7 @@ import Assignment2_Interface as Assignment2
 
 DATABASE_NAME = 'dds_assignment2'
 
-def getOpenConnection(user='postgres', password='admin', dbname='dds_assignment2'):
+def getOpenConnection(user='postgres', password='12345', dbname='dds_assignment2'):
     return psycopg2.connect("dbname='" + dbname + "' user='" + user + "' host='localhost' password='" + password + "'")
 
 def createDB(dbname='dds_assignment2'):
@@ -117,8 +117,6 @@ if __name__ == '__main__':
 
         # Calling ParallelJoin
         print("Performing Parallel Join")
-
-        Assignment2.setupFragments(con)
         Assignment2.parallelJoin('points', 'rectangles', 'parallelJoinOutputTable', 'joinResults.txt', con);
         if con:
             con.close()

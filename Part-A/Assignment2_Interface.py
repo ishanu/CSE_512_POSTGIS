@@ -10,7 +10,7 @@ import threading
 def parallelJoin (pointsTable, rectsTable, outputTable, outputPath, openConnection):
     cur = openConnection.cursor()
     cur.execute('DROP TABLE IF EXISTS final_join')
-    cur.execute("CREATE TABLE final_join (rectangle geometry, _count bigint)")
+    cur.execute("CREATE TABLE final_join (rectangleGeom geometry, _count bigint)")
     createFragments(cur)
     thread1 = thread('p1','r1',cur)
     thread2 = thread('p2','r2',cur)
@@ -24,7 +24,7 @@ def parallelJoin (pointsTable, rectsTable, outputTable, outputPath, openConnecti
     thread2.join()
     thread3.join()
     thread4.join()
-    cur.execute("SELECT DISTINCT rectangle,_count  from final_join order by _count asc")
+    cur.execute("SELECT DISTINCT rectangleGeom,_count  from final_join order by _count asc")
     rows = cur.fetchall()
     f = open(outputPath, "a")
     for row in rows:
@@ -41,8 +41,9 @@ class thread(threading.Thread):
 
     def run(self):
         self.cur.execute(
-            'INSERT INTO final_join (_count,rectangle) SELECT  count( ' + self.pointsTable + '.geom) AS count , ' + self.rectsTable
-            + '.geom as rectangle FROM ' + self.rectsTable
+            'INSERT INTO final_join (rectangleGeom ,_count) SELECT ' + self.rectsTable
+            + '.geom, count( ' + self.pointsTable + '.geom) AS count FROM ' + self.rectsTable
+            + '.geom, count( ' + self.pointsTable + '.geom) AS count FROM ' + self.rectsTable
             + ' JOIN ' + self.pointsTable + ' ON st_contains(' + self.rectsTable + '.geom,' + self.pointsTable + '.geom) GROUP BY '
             + self.rectsTable + '.geom order by count asc')
 

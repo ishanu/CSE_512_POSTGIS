@@ -2,9 +2,6 @@
 # Tester
 #
 
-from subprocess import call
-import os
-import shutil
 import psycopg2
 import sys
 import Assignment2_Interface as Assignment2
@@ -117,8 +114,6 @@ if __name__ == '__main__':
 
         # Calling ParallelJoin
         print("Performing Parallel Join")
-
-        Assignment2.setupFragments(con)
         Assignment2.parallelJoin('points', 'rectangles', 'parallelJoinOutputTable', 'joinResults.txt', con);
         if con:
             con.close()

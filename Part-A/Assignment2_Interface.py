@@ -4,72 +4,82 @@
 
 import psycopg2
 import sys
-from threading import Thread
+import threading
 
-# Do not close the connection inside this file i.e. do not perform openConnection.close()
-def setupFragments (openConnection):
-    cur = openConnection.cursor()
-    cur.execute('select max(st_ymax(geom) - st_ymin(geom)) from rectangles')
-    largest_height = cur.fetchone()[0]
-    cur.execute('select * from rectangles order by latitude2 desc limit 1')
-    highest_latitude = cur.fetchone()[3]
-    cur.execute('select * from rectangles order by latitude1 asc limit 1')
-    lowest_latitude = cur.fetchone()[1]
-    fragmentation_point = (highest_latitude - lowest_latitude) / 4
-    dropTable('pointsf1',cur)
-    dropTable('pointsf2',cur)
-    dropTable('pointsf3',cur)
-    dropTable('pointsf4',cur)
-    dropTable('rectsf1',cur)
-    dropTable('rectsf2',cur)
-    dropTable('rectsf3',cur)
-    dropTable('rectsf4',cur)
-    createFragmentsRectangles(cur, largest_height/2, fragmentation_point, lowest_latitude)
-    createFragmentsPoints(cur, largest_height/2, fragmentation_point, lowest_latitude)
 
+class thread(threading.Thread):
+
+    def __init__(self, pointsTable, rectsTable, cur):
+        threading.Thread.__init__(self)
+        self.pointsTable = pointsTable
+        self.rectsTable = rectsTable
+        self.cur = cur
+
+        # helper function to execute the threads
+
+    def run(self):
+        self.cur.execute(
+            'INSERT INTO output (_count,rectangle) SELECT  count( ' + self.pointsTable + '.geom) AS count , ' + self.rectsTable
+            + '.geom as rectangle FROM ' + self.rectsTable
+            + ' JOIN ' + self.pointsTable + ' ON st_contains(' + self.rectsTable + '.geom,' + self.pointsTable + '.geom) GROUP BY '
+            + self.rectsTable + '.geom order by count asc')
+
+def setupFragments (cur):
+    cur.execute('select max(st_xmax(geom) - st_xmin(geom)) from rectangles')
+    largest_width = cur.fetchone()[0]
+    cur.execute('select * from rectangles order by longitude2 desc limit 1')
+    highest_longitude = cur.fetchone()[3]
+    cur.execute('select * from rectangles order by longitude1 asc limit 1')
+    lowest_longitude = cur.fetchone()[1]
+    fragmentation_point = (highest_longitude - lowest_longitude) / 4
+    cur.execute('DROP TABLE IF EXISTS pointsf1')
+    cur.execute('DROP TABLE IF EXISTS pointsf2')
+    cur.execute('DROP TABLE IF EXISTS pointsf3')
+    cur.execute('DROP TABLE IF EXISTS pointsf4')
+    cur.execute('DROP TABLE IF EXISTS rectsf1')
+    cur.execute('DROP TABLE IF EXISTS rectsf2')
+    cur.execute('DROP TABLE IF EXISTS rectsf3')
+    cur.execute('DROP TABLE IF EXISTS rectsf4')
+    createFragmentsRectangles(cur, largest_width/2, fragmentation_point, lowest_longitude)
+    createFragmentsPoints(cur, largest_width/2, fragmentation_point, lowest_longitude)
     print('fragments complete')
-    cur.close()
-    openConnection.commit()
     pass
 
-def createFragmentsRectangles(cur, largest_height, fragmentation_point, lowest_latitude):
+def createFragmentsRectangles(cur, largest_width, fragmentation_point, lowest_longitude):
     cur.execute(
-        'CREATE TABLE rectsf1 AS select * from rectangles where latitude2 <= ' + str(lowest_latitude + fragmentation_point + largest_height))
+        'CREATE TABLE rectsf1 AS select * from rectangles where longitude2 <= ' + str(lowest_longitude + fragmentation_point + largest_width))
     cur.execute(
-        'CREATE TABLE rectsf2 AS select * from rectangles where latitude1 >= ' + str(lowest_latitude + fragmentation_point - largest_height)
-        + ' and ' + ' latitude2 <= ' + str(lowest_latitude + (2*fragmentation_point) + largest_height))
+        'CREATE TABLE rectsf2 AS select * from rectangles where longitude1 >= ' + str(lowest_longitude + fragmentation_point - largest_width)
+        + ' and ' + ' longitude2 <= ' + str(lowest_longitude + (2*fragmentation_point) + largest_width))
     cur.execute(
-        'CREATE TABLE rectsf3 AS select * from rectangles where latitude1 >= ' + str(lowest_latitude + (2*fragmentation_point) - largest_height)
-        + ' and ' + ' latitude2 <= ' + str(lowest_latitude + (3*fragmentation_point) + largest_height))
+        'CREATE TABLE rectsf3 AS select * from rectangles where longitude1 >= ' + str(lowest_longitude + (2*fragmentation_point) - largest_width)
+        + ' and ' + ' longitude2 <= ' + str(lowest_longitude + (3*fragmentation_point) + largest_width))
     cur.execute(
-        'CREATE TABLE rectsf4 AS select * from rectangles where latitude1 >= ' + str(lowest_latitude + (3*fragmentation_point) - largest_height))
+        'CREATE TABLE rectsf4 AS select * from rectangles where longitude1 >= ' + str(lowest_longitude + (3*fragmentation_point) - largest_width))
 
-def createFragmentsPoints(cur, largest_height, fragmentation_point, lowest_latitude):
+def createFragmentsPoints(cur, largest_width, fragmentation_point, lowest_longitude):
     cur.execute(
-        'CREATE TABLE pointsf1 AS select * from points where latitude <= ' + str(lowest_latitude + fragmentation_point + largest_height))
+        'CREATE TABLE pointsf1 AS select * from points where longitude <= ' + str(lowest_longitude + fragmentation_point + largest_width))
     cur.execute(
-        'CREATE TABLE pointsf2 AS select * from points where latitude >= ' + str(lowest_latitude + fragmentation_point - largest_height)
-        + ' and ' + ' latitude <= ' + str(lowest_latitude + (2*fragmentation_point) + largest_height))
+        'CREATE TABLE pointsf2 AS select * from points where longitude >= ' + str(lowest_longitude + fragmentation_point - largest_width)
+        + ' and ' + ' longitude <= ' + str(lowest_longitude + (2*fragmentation_point) + largest_width))
     cur.execute(
-        'CREATE TABLE pointsf3 AS select * from points where latitude >= ' + str(lowest_latitude + (2*fragmentation_point) - largest_height)
-        + ' and ' + ' latitude <= ' + str(lowest_latitude + (3*fragmentation_point) + largest_height))
+        'CREATE TABLE pointsf3 AS select * from points where longitude >= ' + str(lowest_longitude + (2*fragmentation_point) - largest_width)
+        + ' and ' + ' longitude <= ' + str(lowest_longitude + (3*fragmentation_point) + largest_width))
     cur.execute(
-        'CREATE TABLE pointsf4 AS select * from points where latitude >= ' + str(lowest_latitude + (3*fragmentation_point) - largest_height))
-
-
-
-def dropTable (table_name, cur):
-    cur.execute('DROP TABLE IF EXISTS ' + table_name)
+        'CREATE TABLE pointsf4 AS select * from points where longitude >= ' + str(lowest_longitude + (3*fragmentation_point) - largest_width))
 
 
+# Do not close the connection inside this file i.e. do not perform openConnection.close()
 def parallelJoin (pointsTable, rectsTable, outputTable, outputPath, openConnection):
     cur = openConnection.cursor()
-    dropTable('output',cur)
+    setupFragments(cur)
+    cur.execute('DROP TABLE IF EXISTS output')
     cur.execute("CREATE TABLE output (_count bigint, rectangle geometry)")
-    thread1 = Thread(target = joinFragments, args=('pointsf1','rectsf1',cur))
-    thread2 = Thread(target = joinFragments, args=('pointsf2','rectsf2',cur))
-    thread3 = Thread(target = joinFragments, args=('pointsf3','rectsf3',cur))
-    thread4 = Thread(target = joinFragments, args=('pointsf4','rectsf4',cur))
+    thread1 = thread('pointsf1','rectsf1',cur)
+    thread2 = thread('pointsf2','rectsf2',cur)
+    thread3 = thread('pointsf3','rectsf3',cur)
+    thread4 = thread('pointsf4','rectsf4',cur)
     thread1.start()
     thread2.start()
     thread3.start()
@@ -89,10 +99,9 @@ def parallelJoin (pointsTable, rectsTable, outputTable, outputPath, openConnecti
 
 
 ################### DO NOT CHANGE ANYTHING BELOW THIS #############################
-
 def joinFragments(pointsTable, rectsTable, cur):
     cur.execute('INSERT INTO output (_count,rectangle) SELECT  count( ' + pointsTable + '.geom) AS count , ' + rectsTable
-        +'.geom  as rectangle FROM ' + rectsTable
+        +'.geom as rectangle FROM ' + rectsTable
         + ' JOIN ' + pointsTable + ' ON st_contains('+ rectsTable +'.geom,' + pointsTable + '.geom) GROUP BY '
         +rectsTable +'.geom order by count asc')
 

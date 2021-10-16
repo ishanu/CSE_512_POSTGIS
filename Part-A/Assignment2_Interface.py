@@ -94,7 +94,7 @@ def createFragments(cur):
 ################### DO NOT CHANGE ANYTHING BELOW THIS #############################
 
 # Donot change this function
-def getOpenConnection(user='postgres', password='admin', dbname='dds_assignment2'):
+def getOpenConnection(user='postgres', password='12345', dbname='dds_assignment2'):
     return psycopg2.connect("dbname='" + dbname + "' user='" + user + "' host='localhost' password='" + password + "'")
 
 # Donot change this function

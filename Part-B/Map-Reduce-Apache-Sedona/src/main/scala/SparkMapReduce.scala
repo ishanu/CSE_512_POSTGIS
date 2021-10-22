@@ -5,6 +5,9 @@ import org.apache.spark.sql.functions.split
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.DataFrame
 
+import scala.collection.mutable.ListBuffer
+
+
 object SparkMapReduce {
 
   Logger.getLogger("org.spark_project").setLevel(Level.WARN)
@@ -39,9 +42,33 @@ object SparkMapReduce {
 
     // You need to complete this part
 
+    var listbuffer = new ListBuffer[String]()
+     var sc = spark.sparkContext
+    for (row <- joinRdd.collect)
+    {
+      listbuffer +=row.get(0)+""
+    }
+    val resultRdd = sc.parallelize(listbuffer.toList)
+
+    val rdd2=resultRdd.map(f=>(f,1))
 
 
-    return result // You need to change this part
+
+
+
+
+
+  val output=rdd2.reduceByKey(_ + _)
+
+  // val ouput= rdd2.reduceByKey((accum, n) => (accum + n))
+    var count = new ListBuffer[String]()
+    for (row <- output.collect)
+    {
+      count +=row._2+""
+    }
+    val result = count.toDF()
+
+    return result
   }
 
 }

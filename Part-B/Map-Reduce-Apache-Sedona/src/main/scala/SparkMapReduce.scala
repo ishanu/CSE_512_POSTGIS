@@ -5,7 +5,7 @@ import org.apache.spark.sql.functions.split
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.DataFrame
 
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{ArrayBuffer}
 
 
 object SparkMapReduce {
@@ -41,34 +41,17 @@ object SparkMapReduce {
     val joinRdd = joinDf.rdd
 
     // You need to complete this part
-
-    var listbuffer = new ListBuffer[String]()
-     var sc = spark.sparkContext
-    for (row <- joinRdd.collect)
-    {
-      listbuffer +=row.get(0)+""
+    var rectangles = Array[String]()
+    for (row <- joinRdd.collect) {
+      rectangles = rectangles :+ row.get(0).toString
     }
-    val resultRdd = sc.parallelize(listbuffer.toList)
-
-    val rdd2=resultRdd.map(f=>(f,1))
-
-
-
-
-
-
-
-  val output=rdd2.reduceByKey(_ + _)
-
-  // val ouput= rdd2.reduceByKey((accum, n) => (accum + n))
-    var count = new ListBuffer[String]()
-    for (row <- output.collect)
-    {
-      count +=row._2+""
+    val rectangleRdd = spark.sparkContext.parallelize(rectangles)
+    val mappedRectangleRdd=rectangleRdd.map(f=>(f,1))
+    val reducedRectangleRdd = mappedRectangleRdd.reduceByKey((sum, n) => (sum + n))
+    val count = new ArrayBuffer[Int]()
+    for (row <- reducedRectangleRdd.collect()) {
+      count += row._2
     }
-    val result = count.toDF()
-
-    return result
+    spark.sparkContext.parallelize(count).toDF()
   }
-
 }
